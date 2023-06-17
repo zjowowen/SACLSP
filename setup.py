@@ -17,6 +17,7 @@ setup(
         'matplotlib',
         'wandb',
         'rich',
-        'mujoco_py'
+        'mujoco_py',
+        'easydict',
     ]
 )
