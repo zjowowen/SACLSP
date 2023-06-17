@@ -70,8 +70,8 @@ class SAC:
         self.q_target.load_state_dict(self.q.state_dict())
         env_step=0
 
-        wandb.watch(models=self.policy, log="all", log_freq=1, idx=0, log_graph=True)
-        wandb.watch(models=self.q, log="all", log_freq=1, idx=1, log_graph=True)
+        wandb.watch(models=self.policy, log="all", log_freq=100, idx=0, log_graph=True)
+        wandb.watch(models=self.q, log="all", log_freq=100, idx=1, log_graph=True)
 
         while len(self.buffer.buffer)<self.cfg.train.random_collect_size:
             collected_data=self.env.collect(self.policy, self.cfg.train.num_episodes, device=self.device)
