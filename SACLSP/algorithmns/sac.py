@@ -89,7 +89,7 @@ class SAC:
             env_step+=len(collected_data)
             
             train_data=list(self.buffer.buffer)
-            training_data_num=min(len(collected_data), len(train_data))
+            training_data_num=min(self.cfg.train.train_collect_data_num_ratio*len(collected_data), len(train_data))
             ids=np.random.choice(np.array([i for i in range(len(self.buffer.buffer))]), size=training_data_num, replace=False)
             train_data=[train_data[i] for i in ids]
             train_dataloader=DataLoader(train_data, batch_size=self.cfg.train.batch_size, shuffle=True)
