@@ -1,0 +1,4 @@
+rich
+gym[mujoco]==0.25.1
+mujoco_py
+wandb
