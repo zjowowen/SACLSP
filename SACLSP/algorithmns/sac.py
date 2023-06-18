@@ -24,11 +24,11 @@ class SAC:
         self.q = QModel(cfg.q_model)
         self.q_target = QModel(cfg.q_model)
         if cfg.train.train_entropy_coeffi:
-            self.entropy_coeffi = NonegativeParameter(torch.Tensor(cfg.train.entropy_coeffi))
+            self.entropy_coeffi = NonegativeParameter(torch.tensor(cfg.train.entropy_coeffi))
             self.target_entropy = heuristic_target_entropy(env.action_space) \
                 if not hasattr(cfg.train,'relative_target_entropy_scale') else heuristic_target_entropy(env.action_space) * cfg.train.relative_target_entropy_scale
         else:
-            self.entropy_coeffi = NonegativeParameter(torch.Tensor(cfg.train.entropy_coeffi), requires_grad=False)
+            self.entropy_coeffi = NonegativeParameter(torch.tensor(cfg.train.entropy_coeffi), requires_grad=False)
 
         self.policy.to(self.device)
         self.q.to(self.device)
