@@ -164,7 +164,6 @@ class SAC:
                     optimizer_q.step()
                     optimizer_q.zero_grad()
                     optimizer_policy.zero_grad()
-                    optimizer_entropy_coeffi.zero_grad()
 
                     policy_loss=compute_policy_loss(batch_data)
                     policy_loss=policy_loss*batch_data[0].shape[0]/self.cfg.train.batch_size
@@ -175,10 +174,10 @@ class SAC:
                     optimizer_policy.step()
                     optimizer_q.zero_grad()
                     optimizer_policy.zero_grad()
-                    optimizer_entropy_coeffi.zero_grad()
 
                     entropy_coeffi_loss, average_action_entropy=compute_entropy_coeffi_loss(batch_data)
                     if self.cfg.train.train_entropy_coeffi:
+                        optimizer_entropy_coeffi.zero_grad()
                         entropy_coeffi_loss.backward()
                         optimizer_entropy_coeffi.step()
                         optimizer_q.zero_grad()
