@@ -25,8 +25,9 @@ class SAC:
         self.q_target = QModel(cfg.q_model)
         if cfg.train.train_entropy_coeffi:
             self.entropy_coeffi = NonegativeParameter(torch.tensor(cfg.train.entropy_coeffi))
-            self.target_entropy = heuristic_target_entropy(env.action_space) \
-                if not hasattr(cfg.train,'relative_target_entropy_scale') else heuristic_target_entropy(env.action_space) * cfg.train.relative_target_entropy_scale
+            self.target_entropy = cfg.train.target_entropy if hasattr(cfg.train,'target_entropy') \
+                else heuristic_target_entropy(env.action_space) * cfg.train.relative_target_entropy_scale if hasattr(cfg.train,'relative_target_entropy_scale') \
+                    else heuristic_target_entropy(env.action_space)
         else:
             self.entropy_coeffi = NonegativeParameter(torch.tensor(cfg.train.entropy_coeffi), requires_grad=False)
 
