@@ -141,7 +141,7 @@ class SAC:
                     policy_loss=policy_loss*batch_data[0].shape[0]/self.cfg.train.batch_size
                     policy_loss.backward()
 
-                    policy_grad_norm=torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.cfg.policy_train.grad_clip)
+                    policy_grad_norm=torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.cfg.train.policy_grad_clip)
 
                     optimizer_policy.step()
                     optimizer_q.zero_grad()
