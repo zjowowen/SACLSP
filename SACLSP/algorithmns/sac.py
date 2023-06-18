@@ -72,7 +72,7 @@ class SAC:
             action, logp = self.policy(obs)
             q_value = self.q.min_q(obs, action)
             policy_loss = (self.entropy_coeffi.data * logp - q_value).mean()
-            return policy_loss
+            return policy_loss, logp
         
         def compute_entropy_coeffi_loss(data):
             obs, action, reward, done, next_obs = data
@@ -165,7 +165,7 @@ class SAC:
                     optimizer_q.zero_grad()
                     optimizer_policy.zero_grad()
 
-                    policy_loss=compute_policy_loss(batch_data)
+                    policy_loss, logp=compute_policy_loss(batch_data)
                     policy_loss=policy_loss*batch_data[0].shape[0]/self.cfg.train.batch_size
                     policy_loss.backward()
 
@@ -175,14 +175,17 @@ class SAC:
                     optimizer_q.zero_grad()
                     optimizer_policy.zero_grad()
 
-                    entropy_coeffi_loss, average_action_entropy=compute_entropy_coeffi_loss(batch_data)
                     if self.cfg.train.train_entropy_coeffi:
+                        entropy_coeffi_loss, average_action_entropy=compute_entropy_coeffi_loss(batch_data)
                         optimizer_entropy_coeffi.zero_grad()
                         entropy_coeffi_loss.backward()
                         optimizer_entropy_coeffi.step()
                         optimizer_q.zero_grad()
                         optimizer_policy.zero_grad()
                         optimizer_entropy_coeffi.zero_grad()
+                    else:
+                        with torch.no_grad():
+                            average_action_entropy = -torch.mean(logp)
                     
                         
                     with torch.no_grad():
