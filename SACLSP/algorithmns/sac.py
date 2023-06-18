@@ -48,7 +48,7 @@ class SAC:
             with torch.no_grad():
                 next_action, next_logp = self.policy(next_obs)
                 q_target = reward + self.cfg.train.gamma * (1.0 - done) * (self.q_target.min_q(next_obs, next_action) - self.cfg.train.entropy_coeffi * next_logp)
-                q_target_repeat = q_target.unsqueeze(-1).repeat(1, 2)
+                q_target_repeat = q_target.unsqueeze(-1).repeat(1, self.q.model_num)
             
             q_value=self.q(obs, action)
             q_loss = self.q_loss_fn(q_value, q_target_repeat)
