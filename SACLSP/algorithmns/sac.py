@@ -7,6 +7,8 @@ from SACLSP.policy.sac import SACPolicy
 from SACLSP.environment.env import Env
 from SACLSP.replay_buffer import ReplayBuffer
 from SACLSP.utils.log import log
+from SACLSP.utils.gym_utils import heuristic_target_entropy
+from SACLSP.models.common.parameter import NonegativeParameter
 import easydict
 
 import wandb
@@ -21,10 +23,17 @@ class SAC:
         self.policy = SACPolicy(cfg.policy)
         self.q = QModel(cfg.q_model)
         self.q_target = QModel(cfg.q_model)
+        if cfg.train.train_entropy_coeffi:
+            self.entropy_coeffi = NonegativeParameter(cfg.train.entropy_coeffi)
+            self.target_entropy = heuristic_target_entropy(env.action_space) \
+                if not hasattr(cfg.train,'relative_target_entropy_scale') else heuristic_target_entropy(env.action_space) * cfg.train.relative_target_entropy_scale
+        else:
+            self.entropy_coeffi = NonegativeParameter(cfg.train.entropy_coeffi, requires_grad=False)
 
         self.policy.to(self.device)
         self.q.to(self.device)
         self.q_target.to(self.device)
+        self.entropy_coeffi.to(self.device)
 
         self.env = env
         self.buffer = ReplayBuffer(cfg.replay_buffer)
@@ -47,7 +56,7 @@ class SAC:
             obs, action, reward, done, next_obs = data
             with torch.no_grad():
                 next_action, next_logp = self.policy(next_obs)
-                q_target = reward + self.cfg.train.gamma * (1.0 - done) * (self.q_target.min_q(next_obs, next_action) - self.cfg.train.entropy_coeffi * next_logp)
+                q_target = reward + self.cfg.train.gamma * (1.0 - done) * (self.q_target.min_q(next_obs, next_action) - self.entropy_coeffi.data * next_logp)
                 q_target_repeat = q_target.unsqueeze(-1).repeat(1, self.q.model_num)
             
             q_value=self.q(obs, action)
@@ -61,16 +70,29 @@ class SAC:
             # sample more than 1 action 
             action, logp = self.policy(obs)
             q_value = self.q.min_q(obs, action)
-            policy_loss = (self.cfg.train.entropy_coeffi * logp - q_value).mean()
+            policy_loss = (self.entropy_coeffi.data * logp - q_value).mean()
             return policy_loss
         
+        def compute_entropy_coeffi_loss(data):
+            obs, action, reward, done, next_obs = data
+            with torch.no_grad():
+                action, logp = self.policy(obs)
+                average_action_entropy = -torch.mean(logp)
+            entropy_coeffi_loss = self.entropy_coeffi.data * (average_action_entropy - self.target_entropy)
+
+            return entropy_coeffi_loss, average_action_entropy
+
         optimizer_q = torch.optim.Adam(self.q.parameters(), lr=self.cfg.train.q_lr,weight_decay=self.cfg.train.weight_decay)
         optimizer_policy = torch.optim.Adam(self.policy.parameters(), lr=self.cfg.train.policy_lr,weight_decay=self.cfg.train.weight_decay)
+        if self.cfg.train.train_entropy_coeffi:
+            optimizer_entropy_coeffi = torch.optim.Adam(self.entropy_coeffi.parameters(), lr=self.cfg.train.entropy_coeffi_lr,weight_decay=self.cfg.train.weight_decay)
+
         self.q_target.load_state_dict(self.q.state_dict())
         env_step=0
 
         wandb.watch(models=self.policy, log="all", log_freq=100, idx=0, log_graph=True)
         wandb.watch(models=self.q, log="all", log_freq=100, idx=1, log_graph=True)
+        wandb.watch(models=self.entropy_coeffi, log="all", log_freq=100, idx=2, log_graph=True)
 
         while len(self.buffer.buffer)<self.cfg.train.random_collect_size:
             collected_data=self.env.collect(self.policy, self.cfg.train.num_episodes, device=self.device)
@@ -109,6 +131,10 @@ class SAC:
             policy_mu_model_param_norm_sum=0
             policy_cov_model_param_norm_sum=0
 
+            if self.cfg.train.train_entropy_coeffi:
+                entropy_coeffi_loss_sum=0
+            average_action_entropy_sum=0
+
             for epoch in range(self.cfg.train.num_epochs):
 
                 for batch_data in train_dataloader:
@@ -137,6 +163,8 @@ class SAC:
                     optimizer_q.step()
                     optimizer_q.zero_grad()
                     optimizer_policy.zero_grad()
+                    optimizer_entropy_coeffi.zero_grad()
+
                     policy_loss=compute_policy_loss(batch_data)
                     policy_loss=policy_loss*batch_data[0].shape[0]/self.cfg.train.batch_size
                     policy_loss.backward()
@@ -146,7 +174,17 @@ class SAC:
                     optimizer_policy.step()
                     optimizer_q.zero_grad()
                     optimizer_policy.zero_grad()
+                    optimizer_entropy_coeffi.zero_grad()
 
+                    entropy_coeffi_loss, average_action_entropy=compute_entropy_coeffi_loss(batch_data)
+                    if self.cfg.train.train_entropy_coeffi:
+                        entropy_coeffi_loss.backward()
+                        optimizer_entropy_coeffi.step()
+                        optimizer_q.zero_grad()
+                        optimizer_policy.zero_grad()
+                        optimizer_entropy_coeffi.zero_grad()
+                    
+                        
                     with torch.no_grad():
                         for q_target_param, q_param in zip(self.q_target.parameters(), self.q.parameters()):
                             q_target_param.data.mul_(self.cfg.train.q_target_parameter_decay)
@@ -163,6 +201,9 @@ class SAC:
                         q_param_norm_sum+=q_param_norm.detach().item()*batch_data[0].shape[0]
                         policy_mu_model_param_norm_sum+=policy_mu_model_param_norm.detach().item()*batch_data[0].shape[0]
                         policy_cov_model_param_norm_sum+=policy_cov_model_param_norm.detach().item()*batch_data[0].shape[0]
+                        if self.cfg.train.train_entropy_coeffi:
+                            entropy_coeffi_loss_sum+=entropy_coeffi_loss.detach().item()*batch_data[0].shape[0]
+                        average_action_entropy_sum+=average_action_entropy.detach().item()*batch_data[0].shape[0]
 
             q_loss_mean=q_loss_sum/len(train_data)
             q_value_mean=q_value_sum/len(train_data)
@@ -175,6 +216,9 @@ class SAC:
             q_param_norm_mean=q_param_norm_sum/len(train_data)
             policy_mu_model_param_norm_mean=policy_mu_model_param_norm_sum/len(train_data)
             policy_cov_model_param_norm_mean=policy_cov_model_param_norm_sum/len(train_data)
+            if self.cfg.train.train_entropy_coeffi:
+                entropy_coeffi_loss_mean=entropy_coeffi_loss_sum/len(train_data)
+            average_action_entropy_mean=average_action_entropy_sum/len(train_data)
             wandb_log.update({
                 'q_loss':q_loss_mean, 
                 'q_value':q_value_mean,
@@ -189,6 +233,9 @@ class SAC:
                 'policy_mu_model_param_norm':policy_mu_model_param_norm_mean,
                 'policy_cov_model_param_norm':policy_cov_model_param_norm_mean,
                 })
+            if self.cfg.train.train_entropy_coeffi:
+                wandb_log.update({'entropy_coeffi_loss':entropy_coeffi_loss_mean})
+            wandb_log.update({'average_action_entropy':average_action_entropy_mean})
             
             if train_iter % self.cfg.train.eval_freq == 0:
                 return_ = self.eval()
