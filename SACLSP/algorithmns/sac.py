@@ -235,7 +235,10 @@ class SAC:
                 })
             if self.cfg.train.train_entropy_coeffi:
                 wandb_log.update({'entropy_coeffi_loss':entropy_coeffi_loss_mean})
-            wandb_log.update({'average_action_entropy':average_action_entropy_mean})
+            wandb_log.update({
+                'average_action_entropy':average_action_entropy_mean,
+                'entropy_coeffi':self.entropy_coeffi.data.detach().item(),
+                })
             
             if train_iter % self.cfg.train.eval_freq == 0:
                 return_ = self.eval()
