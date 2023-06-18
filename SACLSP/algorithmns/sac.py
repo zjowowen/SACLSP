@@ -19,8 +19,6 @@ class SAC:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
         self.policy = SACPolicy(cfg.policy)
-        # TODO: 2 q networks
-        # if cfg.twin_critic=True
         self.q = QModel(cfg.q_model)
         self.q_target = QModel(cfg.q_model)
 
@@ -49,10 +47,11 @@ class SAC:
             obs, action, reward, done, next_obs = data
             with torch.no_grad():
                 next_action, next_logp = self.policy(next_obs)
-                q_target = reward + self.cfg.train.gamma * (1.0 - done) * (self.q_target(next_obs, next_action).squeeze(1) - self.cfg.train.entropy_coeffi * next_logp)
-                
-            q_value=self.q(obs, action).squeeze(1)
-            q_loss = self.q_loss_fn(q_value, q_target)
+                q_target = reward + self.cfg.train.gamma * (1.0 - done) * (self.q_target.min_q(next_obs, next_action) - self.cfg.train.entropy_coeffi * next_logp)
+                q_target_repeat = q_target.unsqueeze(-1).repeat(1, 2)
+            
+            q_value=self.q(obs, action)
+            q_loss = self.q_loss_fn(q_value, q_target_repeat)
 
             return q_loss, q_value, q_target
 
@@ -61,7 +60,7 @@ class SAC:
             # TODO
             # sample more than 1 action 
             action, logp = self.policy(obs)
-            q_value = self.q(obs, action).squeeze(1)
+            q_value = self.q.min_q(obs, action)
             policy_loss = (self.cfg.train.entropy_coeffi * logp - q_value).mean()
             return policy_loss
         
@@ -87,7 +86,7 @@ class SAC:
             collected_data=self.env.collect(self.policy, self.cfg.train.num_episodes, device=self.device)
             self.buffer.add_experiences(collected_data)
             env_step+=len(collected_data)
-            
+
             train_data=list(self.buffer.buffer)
             training_data_num=min(self.cfg.train.train_collect_data_num_ratio*len(collected_data), len(train_data))
             ids=np.random.choice(np.array([i for i in range(len(self.buffer.buffer))]), size=training_data_num, replace=False)
@@ -134,7 +133,6 @@ class SAC:
                     q_loss.backward()
 
                     q_grad_norm=torch.nn.utils.clip_grad_norm_(self.q.parameters(), self.cfg.train.grad_clip)
-                    # log.info(f"q_grad_norm: {q_grad_norm}")
 
                     optimizer_q.step()
                     optimizer_q.zero_grad()
@@ -144,7 +142,6 @@ class SAC:
                     policy_loss.backward()
 
                     policy_grad_norm=torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.cfg.train.grad_clip)
-                    # log.info(f"policy_grad_norm: {policy_grad_norm}")
 
                     optimizer_policy.step()
                     optimizer_q.zero_grad()

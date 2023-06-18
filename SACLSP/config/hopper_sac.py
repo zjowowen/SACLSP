@@ -24,6 +24,7 @@ cfg=dict(
             ),
         ),
         q_model=dict(
+            model_num=2,
             model=dict(
                 hidden_sizes=[14, 128, 128],
                 activation='softplus',
