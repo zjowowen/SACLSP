@@ -17,7 +17,7 @@ class TanhFunction(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.transform = TanhTransform(cache_size=1)
-        self.model = MLP(cfg.model)
+        self.model = MLP(cfg)
 
     def forward(self, x):
         return self.transform(self.model(x))
