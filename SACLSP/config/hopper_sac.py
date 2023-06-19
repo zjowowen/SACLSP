@@ -19,7 +19,22 @@ cfg=dict(
                 ),
                 cov=dict(
                     dim=3,
+                    functional=True,
                     random_init=False,
+                    sigma_lambda=dict(
+                        hidden_sizes=[11, 128, 128],
+                        activation='relu',
+                        output_size=3,
+                        dropout=0.01,
+                        layernorm=False,
+                    ),
+                    sigma_offdiag=dict(
+                        hidden_sizes=[11, 128, 128],
+                        activation='relu',
+                        output_size=3,
+                        dropout=0.01,
+                        layernorm=False,
+                    ),
                 ),
             ),
         ),

@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 from .mlp import MLP
-from .parameter import NonegativeParameter, CovarianceMatrix
+from .parameter import NonegativeParameter
+from .matrix import CovarianceMatrix
 from torch.distributions import TransformedDistribution, MultivariateNormal, Independent
 from torch.distributions.transforms import TanhTransform
 
@@ -44,12 +45,16 @@ class GaussianTanh(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.mu_model = MLP(cfg.mu_model)
-        self.cov = CovarianceMatrix(cfg.cov.dim, random_init=cfg.cov.random_init)
+        self.cov = CovarianceMatrix(cfg.cov)
+        self.functional_cov=cfg.cov.functional
 
     def dist(self, conditioning):
         mu=self.mu_model(conditioning)
         # repeat the sigma to match the shape of mu
-        scale_tril = self.cov.low_triangle_matrix.unsqueeze(0).repeat(mu.shape[0], 1, 1)
+        if self.functional_cov:
+            scale_tril = self.cov.low_triangle_matrix(conditioning).unsqueeze(0).repeat(mu.shape[0], 1, 1)
+        else:
+            scale_tril = self.cov.low_triangle_matrix().unsqueeze(0).repeat(mu.shape[0], 1, 1)
         return TransformedDistribution(
             base_distribution=MultivariateNormal(loc=mu, scale_tril = scale_tril),
             transforms=[TanhTransform(cache_size=1)])

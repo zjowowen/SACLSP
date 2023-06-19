@@ -13,9 +13,3 @@ if __name__ == '__main__':
     log.info("config: \n{}".format(cfg))
     wandb.init(project='new-hopper-sac', config=cfg)
     main()
-
-
-
-
-
-
