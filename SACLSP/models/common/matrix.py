@@ -15,14 +15,14 @@ class CovarianceMatrix(nn.Module):
         else:
             self.functional = False
             if cfg.random_init:
-                self.sigma_lambda = NonegativeParameter(torch.abs(nn.init.normal_(torch.Tensor(dim))))
-                self.sigma_offdiag = TanhParameter(torch.tanh(nn.init.normal_(torch.Tensor(dim*(dim-1)//2))))
+                self.sigma_lambda = NonegativeParameter(torch.abs(nn.init.normal_(torch.Tensor(self.dim))))
+                self.sigma_offdiag = TanhParameter(torch.tanh(nn.init.normal_(torch.Tensor(self.dim*(self.dim-1)//2))))
             else:
-                self.sigma_lambda = NonegativeParameter(torch.ones(dim))
-                self.sigma_offdiag = TanhParameter(torch.tanh(torch.zeros(dim*(dim-1)//2)))
+                self.sigma_lambda = NonegativeParameter(torch.ones(self.dim))
+                self.sigma_offdiag = TanhParameter(torch.tanh(torch.zeros(self.dim*(self.dim-1)//2)))
         # register eye matrix
-        self.eye = nn.Parameter(torch.eye(dim), requires_grad=False)
-        self.delta = nn.Parameter(delta*torch.ones(dim), requires_grad=False)
+        self.eye = nn.Parameter(torch.eye(self.dim), requires_grad=False)
+        self.delta = nn.Parameter(delta*torch.ones(self.dim), requires_grad=False)
         
     def low_triangle_matrix(self, x=None):
         low_t_m = self.eye.clone()
