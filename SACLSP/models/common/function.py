@@ -7,7 +7,7 @@ class NonegativeFunction(nn.Module):
 
     def __init__(self, cfg):
         super().__init__()
-        self.model = MLP(cfg.model)
+        self.model = MLP(cfg)
 
     def forward(self, x):
         return torch.exp(self.model(x))
