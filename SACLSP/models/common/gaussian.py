@@ -52,7 +52,7 @@ class GaussianTanh(nn.Module):
         mu=self.mu_model(conditioning)
         # repeat the sigma to match the shape of mu
         if self.functional_cov:
-            scale_tril = self.cov.low_triangle_matrix(conditioning).unsqueeze(0).repeat(mu.shape[0], 1, 1)
+            scale_tril = self.cov.low_triangle_matrix(conditioning)
         else:
             scale_tril = self.cov.low_triangle_matrix().unsqueeze(0).repeat(mu.shape[0], 1, 1)
         return TransformedDistribution(
