@@ -1,3 +1,5 @@
+import os
+import datetime
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -40,6 +42,9 @@ class SAC:
         self.buffer = ReplayBuffer(cfg.replay_buffer)
         self.q_loss_fn = nn.MSELoss()
 
+        # project folder is current folder
+        self.project_folder = os.path.dirname(os.path.abspath(__file__))
+        
         
     def train(self):
 
@@ -102,6 +107,11 @@ class SAC:
 
         self.q_target.load_state_dict(self.q.state_dict())
         env_step=0
+        max_return=-np.inf
+
+        # create folder to save model, of which the name is the current time
+        train_folder = os.path.join(self.project_folder, 'train', datetime.now().strftime("%Y%m%d-%H%M%S"))
+        os.makedirs(train_folder, exist_ok=True)
 
         wandb.watch(models=self.policy, log="all", log_freq=100, idx=0, log_graph=True)
         wandb.watch(models=self.q, log="all", log_freq=100, idx=1, log_graph=True)
@@ -251,13 +261,18 @@ class SAC:
             
             if train_iter % self.cfg.train.eval_freq == 0:
                 return_ = self.eval()
+                if max_return < return_:
+                    max_return = return_
+                    torch.save(self.policy.state_dict(), os.path.join(train_folder, 'policy.pth'))
+                    torch.save(self.q.state_dict(), os.path.join(train_folder, 'q.pth'))
                 wandb_log.update({'return':return_})
                 log.info("train_iter: [{}], env_step: [{}], policy_loss: {}, q_loss: {}, return: {}".format(train_iter, env_step, policy_loss_mean, q_loss_mean, return_))
             else:
                 log.info("train_iter: [{}], env_step: [{}], policy_loss: {}, q_loss: {}".format(train_iter, env_step, policy_loss_mean, q_loss_mean))
 
             wandb.log(wandb_log, step=train_iter)
-            
+        return max_return
+    
     def eval(self):
         self.policy.eval()
         return self.env.evaluate(self.policy, device=self.device)

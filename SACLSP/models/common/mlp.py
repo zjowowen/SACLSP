@@ -20,7 +20,8 @@ class MLP(nn.Module):
             if cfg.layernorm:
                 self.model.add_module('layernorm', nn.LayerNorm(cfg.hidden_sizes[i]))
 
-        self.model.add_module('linear'+str(len(cfg.hidden_sizes)), nn.Linear(cfg.hidden_sizes[-1], cfg.output_size))
+        self.model.add_module('linear'+str(len(cfg.hidden_sizes)-1), nn.Linear(cfg.hidden_sizes[-1], cfg.output_size))
+
         if hasattr(cfg,'final_activation'):
             self.model.add_module('final_activation', get_activation(cfg.final_activation))
         
@@ -28,6 +29,13 @@ class MLP(nn.Module):
             self.scale=nn.Parameter(torch.tensor(cfg.scale),requires_grad=False)
         else:
             self.scale=1.0
+
+        # shrink the weight of linear layer 'linear'+str(len(cfg.hidden_sizes) to it's origin 0.01
+        if hasattr(cfg,'shrink'):
+            if hasattr(cfg,'final_activation'):
+                self.model[-2].weight.data.normal_(0, cfg.shrink)
+            else:
+                self.model[-1].weight.data.normal_(0, cfg.shrink)
 
     def forward(self, x):
         return self.scale*self.model(x)
