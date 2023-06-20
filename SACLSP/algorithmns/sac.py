@@ -1,5 +1,5 @@
 import os
-import datetime
+from datetime import datetime
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -42,8 +42,7 @@ class SAC:
         self.buffer = ReplayBuffer(cfg.replay_buffer)
         self.q_loss_fn = nn.MSELoss()
 
-        # project folder is current folder
-        self.project_folder = os.path.dirname(os.path.abspath(__file__))
+        self.project_folder = os.getcwd()
         
         
     def train(self):
