@@ -43,6 +43,18 @@ class SAC:
         
     def train(self):
 
+        def collect_data(num_steps=None, num_episodes=None):
+            if num_steps is not None:
+                collected_data=self.env.collect(self.policy, num_steps=num_steps, device=self.device)
+            elif num_episodes is not None:
+                collected_data=self.env.collect(self.policy, num_episodes=num_episodes, device=self.device)
+            else:
+                if hasattr(self.cfg.train, 'num_episodes_collected') and self.cfg.train.num_episodes_collected>0:
+                    collected_data=self.env.collect(self.policy, num_episodes=self.cfg.train.num_episodes_collected, device=self.device)
+                elif hasattr(self.cfg.train, 'num_steps_collected') and self.cfg.train.num_steps_collected>0:
+                    collected_data=self.env.collect(self.policy, num_steps=self.cfg.train.num_steps_collected, device=self.device)
+            return collected_data
+
         def preprocess(data):
             obs, action, reward, done, next_obs = data
             obs=obs.to(torch.float32).to(self.device)
@@ -95,10 +107,9 @@ class SAC:
         wandb.watch(models=self.q, log="all", log_freq=100, idx=1, log_graph=True)
         wandb.watch(models=self.entropy_coeffi, log="all", log_freq=100, idx=2, log_graph=True)
 
-        while len(self.buffer.buffer)<self.cfg.train.random_collect_size:
-            collected_data=self.env.collect(self.policy, self.cfg.train.num_episodes, device=self.device)
-            self.buffer.add_experiences(collected_data)
-            env_step+=len(collected_data)
+        collected_data=collect_data(num_steps=self.cfg.train.random_collect_size)
+        self.buffer.add_experiences(collected_data)
+        env_step+=len(collected_data)
 
         for train_iter in range(int(self.cfg.train.num_iters)):
             wandb_log = {}
@@ -106,15 +117,12 @@ class SAC:
             self.policy.eval()
             self.q.eval()
             self.q_target.eval()
-            collected_data=self.env.collect(self.policy, self.cfg.train.num_episodes, device=self.device)
+            collected_data=collect_data()
             self.buffer.add_experiences(collected_data)
             env_step+=len(collected_data)
 
             train_data=list(self.buffer.buffer)
-            training_data_num=min(self.cfg.train.train_collect_data_num_ratio*len(collected_data), len(train_data))
-            ids=np.random.choice(np.array([i for i in range(len(self.buffer.buffer))]), size=training_data_num, replace=False)
-            train_data=[train_data[i] for i in ids]
-            train_dataloader=DataLoader(train_data, batch_size=self.cfg.train.batch_size, shuffle=True)
+            training_data_num=min(self.cfg.train.num_steps_training, len(train_data))
 
             self.policy.train()
             self.q.train()
@@ -137,6 +145,9 @@ class SAC:
             average_action_entropy_sum=0
 
             for epoch in range(self.cfg.train.num_epochs):
+                ids=np.random.choice(np.array([i for i in range(len(self.buffer.buffer))]), size=training_data_num, replace=False)
+                train_data=[train_data[i] for i in ids]
+                train_dataloader=DataLoader(train_data, batch_size=self.cfg.train.batch_size, shuffle=True)
 
                 for batch_data in train_dataloader:
                     # calculate the parameter weight norm of q and policy
@@ -157,22 +168,19 @@ class SAC:
                     batch_data=preprocess(batch_data)
                     q_loss, q_value, q_target=compute_q_loss(batch_data)
                     q_loss=q_loss*batch_data[0].shape[0]/self.cfg.train.batch_size
+                    optimizer_q.zero_grad()
                     q_loss.backward()
-
-                    q_grad_norm=torch.nn.utils.clip_grad_norm_(self.q.parameters(), self.cfg.train.q_grad_clip)
-
+                    q_grad_norm=torch.nn.utils.clip_grad_norm_(self.q.parameters(), self.cfg.train.q_grad_clip*self.q.model_num)
                     optimizer_q.step()
                     optimizer_q.zero_grad()
-                    optimizer_policy.zero_grad()
+                    
 
                     policy_loss, logp=compute_policy_loss(batch_data)
                     policy_loss=policy_loss*batch_data[0].shape[0]/self.cfg.train.batch_size
+                    optimizer_policy.zero_grad()
                     policy_loss.backward()
-
                     policy_grad_norm=torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.cfg.train.policy_grad_clip)
-
                     optimizer_policy.step()
-                    optimizer_q.zero_grad()
                     optimizer_policy.zero_grad()
 
                     if self.cfg.train.train_entropy_coeffi:
@@ -180,8 +188,6 @@ class SAC:
                         optimizer_entropy_coeffi.zero_grad()
                         entropy_coeffi_loss.backward()
                         optimizer_entropy_coeffi.step()
-                        optimizer_q.zero_grad()
-                        optimizer_policy.zero_grad()
                         optimizer_entropy_coeffi.zero_grad()
                     else:
                         with torch.no_grad():
@@ -208,12 +214,12 @@ class SAC:
                             entropy_coeffi_loss_sum+=entropy_coeffi_loss.detach().item()*batch_data[0].shape[0]
                         average_action_entropy_sum+=average_action_entropy.detach().item()*batch_data[0].shape[0]
 
-            q_loss_mean=q_loss_sum/len(train_data)
-            q_value_mean=q_value_sum/len(train_data)
-            q_value_abs_mean=q_value_abs_sum/len(train_data)
+            q_loss_mean=q_loss_sum/len(train_data)/self.q.model_num
+            q_value_mean=q_value_sum/len(train_data)/self.q.model_num
+            q_value_abs_mean=q_value_abs_sum/len(train_data)/self.q.model_num
             q_target_mean=q_target_sum/len(train_data)
             q_target_abs_mean=q_target_abs_sum/len(train_data)
-            q_grad_norm_mean=q_grad_norm_sum/len(train_data)
+            q_grad_norm_mean=q_grad_norm_sum/len(train_data)/self.q.model_num
             policy_loss_mean=policy_loss_sum/len(train_data)
             policy_grad_norm_mean=policy_grad_norm_sum/len(train_data)
             q_param_norm_mean=q_param_norm_sum/len(train_data)
