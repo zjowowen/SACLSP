@@ -1,4 +1,4 @@
 rich
-gym[mujoco]==0.25.1
+gym[mujoco]>=0.26.0
 mujoco_py
 wandb

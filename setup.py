@@ -11,9 +11,9 @@ setup(
     packages=find_packages(
         exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
     install_requires=[
-        'gym[mujoco]==0.25.1',
+        'gym[mujoco]>=0.26.0',
         'numpy',
-        'torch',
+        'torch>=2.0.0',
         'matplotlib',
         'wandb',
         'rich',
