@@ -146,29 +146,30 @@ class Env:
             done = False
             truncated = False
             return_ = 0
+            steps = 1
             with torch.no_grad():
                 while not done:
+                    steps += 1
                     action, log_prob= policy(torch.tensor(obs).unsqueeze(0).to(torch.float32).to(device))
                     action = action.squeeze(0).cpu().detach().numpy()
                     next_obs, reward, done, truncated, _ = self.eval_env.step(action)
                     return_ += reward
                     obs = next_obs
-            return return_
+            return return_, steps
         else:
             obs = self.eval_env.reset()
             done = False
             return_ = 0
+            steps = 1
             with torch.no_grad():
                 while not done:
+                    steps += 1
                     action, log_prob= policy(torch.tensor(obs).unsqueeze(0).to(torch.float32).to(device))
                     action = action.squeeze(0).cpu().detach().numpy()
                     next_obs, reward, done, _ = self.eval_env.step(action)
                     return_ += reward
                     obs = next_obs
-            return return_
-
-
-
+            return return_, steps
 
 
 if __name__ == "__main__":

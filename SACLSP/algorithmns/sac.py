@@ -259,13 +259,13 @@ class SAC:
                 })
             
             if train_iter % self.cfg.train.eval_freq == 0:
-                return_ = self.eval()
+                return_, eval_steps = self.eval()
                 if max_return < return_:
                     max_return = return_
                     torch.save(self.policy.state_dict(), os.path.join(train_folder, 'policy.pth'))
                     torch.save(self.q.state_dict(), os.path.join(train_folder, 'q.pth'))
                 wandb_log.update({'return':return_})
-                log.info("train_iter: [{}], env_step: [{}], policy_loss: {}, q_loss: {}, return: {}".format(train_iter, env_step, policy_loss_mean, q_loss_mean, return_))
+                log.info("train_iter: [{}], env_step: [{}], policy_loss: {}, q_loss: {}, return: {}, eval_steps: {}".format(train_iter, env_step, policy_loss_mean, q_loss_mean, return_, eval_steps))
             else:
                 log.info("train_iter: [{}], env_step: [{}], policy_loss: {}, q_loss: {}".format(train_iter, env_step, policy_loss_mean, q_loss_mean))
 
