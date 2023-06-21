@@ -53,7 +53,7 @@ cfg=dict(
             ),
         ),
         train=dict(
-            random_collect_size=1e4,
+            random_collect_size=1e5,
             gamma=0.99,
             q_lr=0.0003,
             policy_lr=0.0001,
@@ -68,7 +68,7 @@ cfg=dict(
             train_entropy_coeffi=True,
             target_entropy=-20,
             entropy_coeffi_lr=0.001,
-            q_grad_clip=200,
+            q_grad_clip=2000,
             policy_grad_clip=0.5,
             weight_decay=0.0001,
         ),
