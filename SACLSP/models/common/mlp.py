@@ -15,9 +15,9 @@ class MLP(nn.Module):
                 self.model.add_module('activation'+str(i), get_activation(cfg.activation[i]))
             else:
                 self.model.add_module('activation'+str(i), get_activation(cfg.activation))
-            if cfg.dropout > 0:
+            if hasattr(cfg,"dropout") and cfg.dropout > 0:
                 self.model.add_module('dropout', nn.Dropout(cfg.dropout))
-            if cfg.layernorm:
+            if hasattr(cfg,"layernorm") and cfg.layernorm:
                 self.model.add_module('layernorm', nn.LayerNorm(cfg.hidden_sizes[i]))
 
         self.model.add_module('linear'+str(len(cfg.hidden_sizes)-1), nn.Linear(cfg.hidden_sizes[-1], cfg.output_size))
