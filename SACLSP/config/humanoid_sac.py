@@ -53,7 +53,7 @@ cfg=dict(
             ),
         ),
         train=dict(
-            random_collect_size=1e5,
+            random_collect_size=1e4,
             gamma=0.99,
             q_lr=0.0003,
             policy_lr=0.0001,
