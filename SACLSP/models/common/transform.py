@@ -21,14 +21,14 @@ class CompositeTransform(Transform):
         self.transforms = nn.ModuleList(transforms)
 
     def forward(self, x, condition=None, **kwargs):
-        log_det = torch.zeros_like(x)
+        log_det = torch.zeros(x.shape[0])
         for transform in self.transforms:
             x, ld = transform(x, condition, **kwargs)
             log_det += ld
         return x, log_det
     
     def inverse(self, x, condition=None, **kwargs):
-        log_det = torch.zeros_like(x)
+        log_det = torch.zeros(x.shape[0])
         for transform in reversed(self.transforms):
             x, ld = transform.inverse(x, condition, **kwargs)
             log_det += ld

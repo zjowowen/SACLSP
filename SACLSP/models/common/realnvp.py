@@ -4,7 +4,7 @@ from torch import nn
 from torch.nn import functional as F
 from .gaussian import StandardGaussian
 from .flow import Flow
-from .transform import AdditiveCouplingTransform, AffineCouplingTransform, CouplingTransform
+from .transform import AdditiveCouplingTransform, AffineCouplingTransform, CouplingTransform, CompositeTransform
 from .resnet import ResidualNet
 
 class RealNVP(Flow):
@@ -30,7 +30,8 @@ class RealNVP(Flow):
         else:
             coupling_constructor=AffineCouplingTransform
 
-        mask = torch.ones(feature_dim)[::2]=-1
+        mask = torch.ones(feature_dim)
+        mask[::2] = -1
 
         def create_resnet(input_dim, output_dim):
             return ResidualNet(
@@ -51,5 +52,5 @@ class RealNVP(Flow):
         
         super().__init__(
             base_dist=StandardGaussian(feature_dim), 
-            transform=CouplingTransform(layers)
+            transform=CompositeTransform(layers)
         )

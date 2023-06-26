@@ -10,8 +10,11 @@ class Flow(Distribution):
         self.transform = transform
 
     def forward(self, x, condition=None, **kwargs):
-        return self.transform(x, condition, **kwargs)
+        return self.transform.forward(x, condition, **kwargs)
     
+    def inverse(self, x, condition=None, **kwargs):
+        return self.transform.inverse(x, condition, **kwargs)
+
     def log_prob(self, x, condition=None, **kwargs):
         z, log_det = self.transform.inverse(x, condition, **kwargs)
         log_prob_z = self.base_dist.log_prob(z, condition, **kwargs)
@@ -19,7 +22,7 @@ class Flow(Distribution):
     
     def rsample_and_log_prob(self, condition=None, sample_shape=torch.Size(), **kwargs):
         z, log_prob_z = self.base_dist.rsample_and_log_prob(condition, sample_shape=sample_shape, **kwargs)
-        x, log_det = self.transform(z, condition, **kwargs)
+        x, log_det = self.transform.forward(z, condition, **kwargs)
         log_prob = log_prob_z + log_det
         return x, log_prob
 
